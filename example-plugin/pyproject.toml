@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geospatial-example-bearing-matcher"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["geospatial-base-sdk>=0.1.0,<1"]
+description = "Example geospatial plugin consuming the core SDK"
+
+[project.entry-points."geospatial.modules"]
+bearing_matcher = "bearing_matcher.plugin:setup"
+
+[project.entry-points."geospatial.sources"]
+example_observations = "bearing_matcher.source:setup"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geospatial-base-sdk"
+version = "0.1.0"
+description = "Composable geospatial SDK with source plugins, evidence models, geometry, statistics, storage and reporting"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2.5,<3"]
+
+[project.optional-dependencies]
+r2 = ["boto3>=1.28"]
+map = ["folium>=0.15"]
+all = ["boto3>=1.28", "folium>=0.15", "pyproj>=3.5"]
+dev = ["pytest>=8", "boto3>=1.28", "folium>=0.15"]
+
+[project.scripts]
+geospatial-sources = "base.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
