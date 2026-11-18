@@ -1,6 +1,8 @@
 # Geospatial Base SDK
 
-An installable **shared Python package**, `base`, for independent geospatial plugins.
+An installable **shared Python package**, distributed as `gspace-sdk`. New
+projects should import `gspace`; the existing `base` namespace remains
+supported during the 0.x compatibility period.
 Data collection, common contracts, geometry, statistics, storage, and reporting live here;
 application-specific CV/ML/analytics logic belongs in plugins.
 
@@ -37,10 +39,10 @@ base/src/base/
 ## Quickstart, offline
 
 ```python
-from base.schemas import GeoPoint, BoundingBox, EvidenceItem, GeoCandidate
-from base.geo_math import haversine_m, bbox_from_radius
-from base.stats import aggregate_evidence
-from base.reporting import export_geojson
+from gspace.schemas import GeoPoint, BoundingBox, EvidenceItem, GeoCandidate
+from gspace.geo_math import haversine_m, bbox_from_radius
+from gspace.stats import aggregate_evidence
+from gspace.reporting import export_geojson
 
 origin = GeoPoint(lat=56.3398, lng=-2.7967, uncertainty_m=25)
 area = bbox_from_radius(origin, 1000)
@@ -83,6 +85,57 @@ roads = osm.fetch_roads(bounds, highway_types=["primary", "secondary"])
 elevation = dem.fetch_patch(bounds, rows=4, cols=4)
 ```
 
+For callers that need coverage and source lineage, use the typed OSM query
+surface. A saturated response or an older cache entry without verification
+metadata is reported as partial, while the existing `fetch_roads()` API
+remains available:
+
+```python
+from base.datasources import LayerRequest, SpatialQuery, query_osm_roads
+
+query = SpatialQuery(
+    region=bounds,
+    layers=[LayerRequest(name="osm.roads", filters={"highway_types": ["primary"]})],
+    offline=True,
+)
+result = query_osm_roads(query)
+print(result.coverage.status, len(result.data["features"]))
+```
+
+Set `require_complete=True` to raise `IncompleteCoverageError` with a
+structured coverage report whenever any tile is missing, saturated, or
+unverifiable. A successful empty tile remains complete. GeoJSON coordinates
+use `[longitude, latitude]`; source attribution is included in provenance.
+`max_requests` caps calls dispatched by the adapter through its supplied (or
+default) `Transport`. A retry hidden inside a caller-provided transport counts
+as one adapter call; that transport must enforce its own retry limit.
+
+### Local OSM extracts and replay
+
+`base.datasources.local_osm.query_local_osm_roads` reads GeoJSON locally and
+never uses the network. Put a `roads.geojson.manifest.json` sidecar next to
+the extract with a SHA-256 checksum, provider/source ID, declared coverage
+bounds, a completeness claim, and any known licence/attribution. The adapter
+reports `unknown` when these claims are absent, reports partial coverage when
+the requested bounds exceed the declared extent, and rejects checksum
+mismatches. The manifest is a trusted source declaration supplied by the
+extract publisher: its checksum detects changed GeoJSON relative to that
+manifest, but it does not authenticate the manifest or prove the publisher's
+completeness claim. Coordinates must use GeoJSON's default WGS84 longitude/
+latitude axes or an explicit OGC CRS84 declaration; other CRS declarations,
+including EPSG:4326 where axis semantics are ambiguous, are rejected. Only
+`LineString` and `MultiLineString` road geometries
+are supported; unsupported or malformed relevant geometries make the full
+requested region unknown within a partial result. Conflicting duplicate OSM IDs are retained with a
+stable conflict suffix and make the result partial.
+
+`snapshot_local_osm_extract(source, "roads.zip")` writes a deterministic,
+relocatable snapshot containing the exact GeoJSON bytes and manifest.
+`query_local_osm_roads(query, "roads.zip")` replays it without extraction or
+network access and verifies the data checksum before returning results.
+Uncompressed GeoJSON members are limited to 512 MiB and manifest members to
+2 MiB to bound snapshot reads.
+
 These two adapters use the public Overpass and OpenTopoData APIs. They have finite
 request sizes/timeouts, no bulk download API, and no guaranteed uptime. Elevation
 is SRTM90m (roughly ±60° latitude); missing cells return None. See source sites
@@ -119,6 +172,29 @@ The runner validates the output type; it does **not** imply calibrated
 probabilities. Use `base.stats.evaluation` on held-out ground truth and only set
 `GeoCandidate.confidence` when empirically justified. Location radii of `None`
 mean **unknown**, not zero. Inferred news locations are flagged as such.
+
+For isolated pipelines, construct a `PluginSpec` and call
+`run_plugin_spec(spec, ...)`; this validates inputs and outputs without
+registering the spec or discovering entry points. `plugin_discovery_report()`
+returns the registered specs and entry-point setup errors. The existing
+`list_plugins()` still returns `list[PluginSpec]` for compatibility.
+
+To create an installable starter package, install the SDK and run the scaffold
+command from the repository root:
+
+```bash
+python -m pip install -e ./base
+geospatial plugin create my-map-plugin --path ./plugins
+python -m pip install -e './plugins/my_map_plugin[dev]'
+python -m pytest ./plugins/my_map_plugin/tests
+python ./plugins/my_map_plugin/examples/run_pipeline.py
+```
+
+The generated package includes a `geospatial.modules` entry point, a typed
+Pydantic input/output example, a test, an example pipeline, and its own
+README. The scaffold refuses to overwrite an existing destination. The
+existing `geospatial-sources` command remains available for source listing and
+fetching.
 
 ## Testing without touching R2
 

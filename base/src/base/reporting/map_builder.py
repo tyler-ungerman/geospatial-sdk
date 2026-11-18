@@ -1,4 +1,4 @@
-"""HTML map export is opt-in (pip install geospatial-base-sdk[map])."""
+"""HTML map export is opt-in (pip install gspace-sdk[map])."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ def export_html(records: list[GeoCandidate | GeoEntity | GeoEvent], output_path:
     try:
         import folium
     except ImportError as exc:
-        raise RuntimeError("Install geospatial-base-sdk[map] for Folium map export") from exc
+        raise RuntimeError("Install gspace-sdk[map] for Folium map export") from exc
     points = [r for r in records if r.location is not None]
     center = ([sum(r.location.lat for r in points)/len(points),
                sum(r.location.lng for r in points)/len(points)] if points else [0.0, 0.0])

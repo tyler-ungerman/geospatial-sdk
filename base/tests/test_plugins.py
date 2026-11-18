@@ -9,6 +9,10 @@ from base.schemas import GeoPoint
 def test_independently_installed_domain_and_source_plugins():
     import bearing_matcher
     assert "bearing_matcher" in [p.name for p in list_plugins()]
+    assert "road_layer_summary" in [p.name for p in list_plugins()]
+    summary_spec = next(p for p in list_plugins() if p.name == "road_layer_summary")
+    assert summary_spec.api_version == "1.0.0"
+    assert summary_spec.resource_needs == ("osm.roads",)
     assert "example_observations" in [s.name for s in list_sources()]
     result = run_plugin("bearing_matcher", [GeoPoint(lat=56.34, lng=-2.8)],
                         GeoPoint(lat=56.35, lng=-2.8), observed_bearing_deg=0)

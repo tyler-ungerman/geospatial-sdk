@@ -1,10 +1,23 @@
 """Plugin shows how specialized logic composes base schemas/math/stats."""
 from __future__ import annotations
 
-from base.geo_math import initial_bearing_deg, angular_difference_deg
-from base.plugins import register_plugin
-from base.schemas import EvidenceItem, GeoCandidate, GeoPoint
-from base.stats import aggregate_evidence
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from gspace.geo_math import initial_bearing_deg, angular_difference_deg
+from gspace.plugins import register_plugin
+from gspace.datasources.query import LayerResult
+from gspace.schemas import EvidenceItem, GeoCandidate, GeoPoint
+from gspace.stats import aggregate_evidence
+
+
+class RoadLayerSummary(BaseModel):
+    """Typed report showing that plugins can return structured results."""
+
+    model_config = ConfigDict(extra="forbid")
+    feature_count: int = Field(ge=0)
+    coverage_status: Literal["complete", "partial", "unknown", "failed"]
+    highway_counts: dict[str, int]
 
 
 def match_bearings(candidates: list[GeoPoint], landmark: GeoPoint, *,
@@ -27,5 +40,20 @@ def match_bearings(candidates: list[GeoPoint], landmark: GeoPoint, *,
     return aggregate_evidence(records)
 
 
+def summarize_roads(layer: LayerResult) -> dict:
+    """Summarize an SDK road result without changing or ranking its features."""
+    counts: dict[str, int] = {}
+    for feature in layer.data.get("features", []):
+        highway = (feature.get("properties") or {}).get("highway")
+        if isinstance(highway, str):
+            counts[highway] = counts.get(highway, 0) + 1
+    return {"feature_count": len(layer.data.get("features", [])),
+            "coverage_status": layer.coverage.status,
+            "highway_counts": counts}
+
+
 def setup() -> None:
     register_plugin("bearing_matcher", "Candidate observer locations from measured landmark bearings")(match_bearings)
+    register_plugin("road_layer_summary", "Summarize a typed OSM layer result",
+        api_version="1.0.0", input_type=LayerResult, output_type=RoadLayerSummary,
+        resource_needs=("osm.roads",))(summarize_roads)

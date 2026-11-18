@@ -1,0 +1,82 @@
+name: SDK CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check public tree excludes private assets
+        run: |
+          if git ls-files | grep -E '(^image-locator/|(^|/)\.codex/|(^|/)\.env($|\.)|\.(pt|pkl|parquet)$)'; then
+            echo "Private paths, environment files, or data artifacts are tracked in the public repository" >&2
+            exit 1
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            base/pyproject.toml
+            example-plugin/pyproject.toml
+      - name: Install build tools
+        run: python -m pip install --upgrade build
+      - name: Build distributable wheels
+        run: |
+          python -m build --wheel --outdir dist/base ./base
+          python -m build --wheel --outdir dist/example-plugin ./example-plugin
+      - name: Verify wheel license metadata and files
+        run: |
+          python - <<'PY'
+          from email.parser import Parser
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheels = list(Path("dist").rglob("*.whl"))
+          assert len(wheels) == 2, wheels
+          for wheel in wheels:
+              with ZipFile(wheel) as archive:
+                  names = archive.namelist()
+                  metadata_name = next(name for name in names if name.endswith(".dist-info/METADATA"))
+                  metadata = Parser().parsestr(archive.read(metadata_name).decode())
+                  assert metadata.get("License-Expression") == "MIT", (wheel, metadata.get("License-Expression"))
+                  assert any(name.endswith(".dist-info/licenses/LICENSE") for name in names), (wheel, names)
+          PY
+      - name: Install wheels in a clean virtual environment
+        run: |
+          python -m venv .venv-package
+          if [ "${{ matrix.python-version }}" = "3.12" ]; then
+            .venv-package/bin/python -m pip install --require-hashes -r requirements/ci-py312.txt
+          else
+            .venv-package/bin/python -m pip install \
+              pytest 'pydantic>=2.5,<3' 'boto3>=1.28' 'folium>=0.15' 'pyproj>=3.5'
+          fi
+          .venv-package/bin/python -m pip install --no-index --no-deps \
+            --find-links dist/base --find-links dist/example-plugin \
+            gspace-sdk geospatial-example-bearing-matcher
+      - name: Test installed packages and independent plugin
+        run: .venv-package/bin/python -m pytest -q base/tests example-plugin/tests
+      - name: Smoke test installed entry points
+        run: |
+          .venv-package/bin/python - <<'PY'
+          from gspace.plugins import list_plugins, run_plugin
+          from gspace.datasources import list_sources
+          from gspace.schemas import GeoPoint
+
+          names = {plugin.name for plugin in list_plugins()}
+          assert {"bearing_matcher", "road_layer_summary"} <= names, names
+          assert any(source.name == "example_observations" for source in list_sources())
+          result = run_plugin("bearing_matcher", [GeoPoint(lat=56.34, lng=-2.80)],
+                              GeoPoint(lat=56.35, lng=-2.80), observed_bearing_deg=0)
+          assert result and result[0].rank_score is not None
+          PY

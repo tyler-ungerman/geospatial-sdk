@@ -103,7 +103,7 @@ class R2Store:
                 import boto3
                 from botocore.config import Config
             except ImportError as exc:
-                raise RuntimeError("Install geospatial-base-sdk[r2] to use R2Store") from exc
+                raise RuntimeError("Install gspace-sdk[r2] to use R2Store") from exc
             account = self.account_id or os.getenv("R2_ACCOUNT_ID")
             access = self.access_key_id or os.getenv("R2_ACCESS_KEY_ID")
             secret = self.secret_access_key or os.getenv("R2_SECRET_ACCESS_KEY")

@@ -1,8 +1,8 @@
 """Example source adapter for observations supplied by caller, not fake network data."""
 from __future__ import annotations
 
-from base.datasources import register_source
-from base.schemas import GeoEvent
+from gspace.datasources import register_source
+from gspace.schemas import GeoEvent
 
 
 def fetch_observations(*, client=None, observations: list[dict] | None = None) -> list[dict]:

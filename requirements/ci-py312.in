@@ -1,0 +1,7 @@
+# External requirements needed to exercise the complete public SDK test suite.
+# Keep aligned with base/pyproject.toml [project.dependencies] and [dev].
+pytest>=8
+pydantic>=2.5,<3
+boto3>=1.28
+folium>=0.15
+pyproj>=3.5

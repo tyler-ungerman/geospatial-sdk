@@ -1,23 +1,27 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "geospatial-base-sdk"
+name = "gspace-sdk"
 version = "0.1.0"
 description = "Composable geospatial SDK with source plugins, evidence models, geometry, statistics, storage and reporting"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "Tyler Ungerman"}]
 dependencies = ["pydantic>=2.5,<3"]
 
 [project.optional-dependencies]
 r2 = ["boto3>=1.28"]
 map = ["folium>=0.15"]
 all = ["boto3>=1.28", "folium>=0.15", "pyproj>=3.5"]
-dev = ["pytest>=8", "boto3>=1.28", "folium>=0.15"]
+dev = ["pytest>=8", "boto3>=1.28", "folium>=0.15", "pyproj>=3.5"]
 
 [project.scripts]
 geospatial-sources = "base.cli:main"
+geospatial = "base.project_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
